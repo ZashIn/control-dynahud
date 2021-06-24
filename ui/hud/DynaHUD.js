@@ -49,6 +49,13 @@
             missionUpdateHideTime: 7000,
         },
 
+        crosshair: {
+            // Whether to show the crosshair when it changes.
+            showOnWeaponChange: true,
+
+            // How long to show the crosshair after it changed.
+            changeHideTime: 2000,
+        },
     }
 
     //====================
@@ -99,7 +106,7 @@
 
     if (CONFIG.general.dynamicCrosshair) {
         _LOG("Configuring crosshair...")
-        setupCrosshair()
+        setupCrosshair(CONFIG.crosshair);
     }
 
     _LOG("Configuring ammo bar...")
@@ -279,25 +286,28 @@
     //==============
     // Crosshair
     //==============
-    function setupCrosshair() {
+    function setupCrosshair(CONFIG) {
         // State
-        let playerMode = g_HUDMode.m_iPlayerMode
+        let playerMode = g_HUDMode.m_iPlayerMode,
+            crosshairType,
+            hideTimer;
 
         // Elements
-        let crosshair
+        let crosshair;
 
         UIF.hud.onHUDVisible(() => {
             waitForSelector(".awesome-crosshair").then(crosshairElem => {
-                crosshair = crosshairElem
-                evaluateDisplayConditions()
-            })
-        })
+                crosshair = crosshairElem;
+                crosshairType = g_crosshairData.m_eCrosshairType;
+                evaluateDisplayConditions();
+            });
+        });
 
         // Register player mode change listener
         engine.addModelChangeListener(g_HUDMode, "m_iPlayerMode", () => {
             let newMode = g_HUDMode.m_iPlayerMode
             let oldMode = playerMode
-            
+
             if (newMode != oldMode) {
                 playerMode = newMode
                 if (newMode == PLAYER_MODE.ADVENTURING) {
@@ -311,9 +321,40 @@
             }
         })
 
+        // Register crosshair type change listener
+        engine.addModelChangeListener(g_crosshairData, 'm_eCrosshairType', () => {
+            // _LOG('Crosshair: changed, new type: ' + g_crosshairData.m_eCrosshairType);
+            evaluateDisplayConditions();
+        });
+
         function evaluateDisplayConditions() {
-            let shouldHideCrosshair = (playerMode == PLAYER_MODE.ADVENTURING)
-            crosshair.classList.toggle("dynahud-hide", shouldHideCrosshair)
+            const shouldHideCrosshair = playerMode == PLAYER_MODE.ADVENTURING,
+                crosshiarTypeChanged = checkCrosshairType();
+            if (!shouldHideCrosshair) {
+                showCrosshiar();
+            } else if (CONFIG.showOnWeaponChange && crosshiarTypeChanged) {
+                showCrosshiar();
+                hideTimer = setTimeout(() => {
+                    clearTimeout(hideTimer);
+                    hideTimer = null;
+                    evaluateDisplayConditions();
+                }, CONFIG.changeHideTime);
+            } else if (!hideTimer) {
+                crosshair.classList.toggle("dynahud-hide", true);
+            }
+        }
+
+        // Updates the crosshairType, returns true if it changed.
+        function checkCrosshairType() {
+            const lastCrosshairType = crosshairType;
+            crosshairType = g_crosshairData.m_eCrosshairType;
+            return lastCrosshairType !== crosshairType;
+        }
+
+        function showCrosshiar() {
+            crosshair.classList.toggle("dynahud-hide", false);
+            clearTimeout(hideTimer);
+            hideTimer = null;
         }
     }
 
