@@ -1,7 +1,7 @@
 /*==========================================*\
 | Dynamic HUD (DynaHUD) for Control by reg2k |
 \*==========================================*/
-(function() {
+(function () {
     //=================
     // Configuration
     //=================
@@ -56,14 +56,14 @@
             // How long to show the crosshair after it changed.
             changeHideTime: 2000,
         },
-    }
+    };
 
     //====================
     // End Configuration
     //====================
 
     // Import useful library functions from the UI Framework
-    const { waitForSelector, getComponent } = UIF
+    const { waitForSelector, getComponent } = UIF;
 
     //===========
     // Constants
@@ -75,14 +75,14 @@
         ACTION: 3,
         EXAMINE: 4,
         HIDDEN: 5,
-    }
+    };
     // Player Modes
     // 0: PLAYER_MODE_COMBAT
     // 1: PLAYER_MODE_ADVENTURING (e.g. running around, no enemies)
     // 2: PLAYER_MODE_STORY (e.g. central executive)
     // 3: PLAYER_MODE_ACTION (e.g. aiming, levitating, melee while out of combat)
     // 4: PLAYER_MODE_EXAMINE (e.g. ?)
-    // 5: HIDDEN (e.g. ?)   
+    // 5: HIDDEN (e.g. ?)
 
     //=========
     // State
@@ -91,107 +91,114 @@
     //=========
     // Code
     //=========
-    _LOG("DynamicHUD start")
+    _LOG("DynamicHUD start");
 
     // Create instances
     if (CONFIG.general.dynamicHealthBar) {
-        _LOG("Configuring health bar...")
-        setupHealthBar(CONFIG.health_bar)
+        _LOG("Configuring health bar...");
+        setupHealthBar(CONFIG.health_bar);
     }
 
     if (CONFIG.general.dynamicMissionLog) {
-        _LOG("Configuring mission log...")
-        let missionLog = new setupMissionLog(CONFIG.mission_log)
+        _LOG("Configuring mission log...");
+        setupMissionLog(CONFIG.mission_log);
     }
 
     if (CONFIG.general.dynamicCrosshair) {
-        _LOG("Configuring crosshair...")
+        _LOG("Configuring crosshair...");
         setupCrosshair(CONFIG.crosshair);
     }
 
-    _LOG("Configuring ammo bar...")
-    let ammoBar = new setupAmmoBar()
+    _LOG("Configuring ammo bar...");
+    setupAmmoBar();
 
-    _LOG("Setup complete.")
+    _LOG("Setup complete.");
 
     //==============
     // Health Bar
     //==============
     function setupHealthBar(CONFIG) {
         // State
-        let hpbarShown = true // to keep track internally whether we have hidden or shown the component
-        let hpbarHideTimerID = 0
-        let playerMode = g_HUDMode.m_iPlayerMode
+        let hpbarShown = true; // to keep track internally whether we have hidden or shown the component
+        let hpbarHideTimerID = 0;
+        let playerMode = g_HUDMode.m_iPlayerMode;
 
         // Elements
-        let hpbar, hpbarFill
+        let hpbar, hpbarFill;
 
         // Do nothing if health bar is disabled in game settings
         if (!g_runtimeInterfaceOptions.m_bPlayerStatsEnabled) {
-            _LOG("DynaHUD: Health bar disabled")
-            return
+            _LOG("DynaHUD: Health bar disabled");
+            return;
         }
 
         UIF.hud.onHUDVisible(() => {
-            hpbarShown = true
+            hpbarShown = true;
             Promise.all([
                 waitForSelector(".health-bar"),
-                waitForSelector(".health-bar__fill")
-            ])
-            .then(elems => {
-                [hpbar, hpbarFill] = elems
-                onHPChange()
-                let hpObserver = new MutationObserver(ms => ms.forEach(m => onHPChange()))
-                hpObserver.observe(hpbarFill, { attributes: true, attributeFilter: ['style'] })
-            })
-        })
+                waitForSelector(".health-bar__fill"),
+            ]).then((elems) => {
+                [hpbar, hpbarFill] = elems;
+                onHPChange();
+                let hpObserver = new MutationObserver((ms) =>
+                    ms.forEach((m) => onHPChange())
+                );
+                hpObserver.observe(hpbarFill, {
+                    attributes: true,
+                    attributeFilter: ["style"],
+                });
+            });
+        });
 
         // Register player mode change listener
         if (CONFIG.showDuringCombat) {
             engine.addModelChangeListener(g_HUDMode, "m_iPlayerMode", () => {
-                let newMode = g_HUDMode.m_iPlayerMode
-                let oldMode = playerMode
-                
+                let newMode = g_HUDMode.m_iPlayerMode;
+                let oldMode = playerMode;
+
                 if (newMode != oldMode) {
-                    playerMode = newMode
+                    playerMode = newMode;
                     if (newMode == PLAYER_MODE.COMBAT) {
-                        _LOG("HP: Player entering combat")
-                        onHPChange()
-                    }
-                    else if (oldMode == PLAYER_MODE.COMBAT) {
-                        _LOG("HP: Player leaving combat")
-                        onHPChange()
+                        _LOG("HP: Player entering combat");
+                        onHPChange();
+                    } else if (oldMode == PLAYER_MODE.COMBAT) {
+                        _LOG("HP: Player leaving combat");
+                        onHPChange();
                     }
                 }
-            })
+            });
         }
 
         function onHPChange() {
-            var healthPercent = hpbarFill.getBoundingClientRect().width / hpbarFill.offsetWidth
+            var healthPercent =
+                hpbarFill.getBoundingClientRect().width / hpbarFill.offsetWidth;
             // _LOG('HP changed: ' + healthPercent);
 
             // If healthPercent < 1 OR in combat then show, otherwise hide.
-            let shouldShow = (healthPercent < CONFIG.showHealthThreshold) || (CONFIG.showDuringCombat && (playerMode == PLAYER_MODE.COMBAT))
+            let shouldShow =
+                healthPercent < CONFIG.showHealthThreshold ||
+                (CONFIG.showDuringCombat && playerMode == PLAYER_MODE.COMBAT);
             if (!hpbarShown && shouldShow) {
-                _LOG("Showing HP bar")
-                hpbarShown = true
-                hpbar.style.opacity = "" // remove override and use style-defined opacity
+                _LOG("Showing HP bar");
+                hpbarShown = true;
+                hpbar.style.opacity = ""; // remove override and use style-defined opacity
 
                 // Cancel any pending fade-out requests
                 if (hpbarHideTimerID) {
-                    clearTimeout(hpbarHideTimerID)
-                    hpbarHideTimerID = 0
+                    clearTimeout(hpbarHideTimerID);
+                    hpbarHideTimerID = 0;
                 }
-            }
-            else if (hpbarShown && !shouldShow) {
+            } else if (hpbarShown && !shouldShow) {
                 // Schedule fading out HP bar
                 if (!hpbarHideTimerID) {
                     hpbarHideTimerID = setTimeout(() => {
-                        _LOG("Hiding HP bar")
-                        hpbarShown = false
-                        hpbar.style.opacity = getCSSProperty("--dynahud-opacity-hp-bar-hidden")
-                        hpbarHideTimerID = 0
-                    }, CONFIG.hpFadeTime)
+                        _LOG("Hiding HP bar");
+                        hpbarShown = false;
+                        hpbar.style.opacity = getCSSProperty(
+                            "--dynahud-opacity-hp-bar-hidden"
+                        );
+                        hpbarHideTimerID = 0;
+                    }, CONFIG.hpFadeTime);
                 }
             }
         }
@@ -202,62 +209,66 @@
     //==============
     function setupMissionLog(CONFIG) {
         // State
-        let missionLogShown = false
-        let hideTimer = 0
+        let missionLogShown = false;
+        let hideTimer = 0;
 
         // Elements
-        let map, missionLog
+        let map, missionLog;
 
         // Code
 
         // Do nothing if mission overlay is turned off in game settings
         if (!g_runtimeInterfaceOptions.m_bMissionHUDEnabled) {
-            _LOG("DynaHUD: Mission overlay not enabled")
-            return
+            _LOG("DynaHUD: Mission overlay not enabled");
+            return;
         }
 
         // Register for HUD visibility
         UIF.hud.onHUDVisible(() => {
             Promise.all([
                 waitForSelector(".map-overlay"),
-                waitForSelector(".mission-log-wrapper")
-            ])
-            .then(elems => {
-                [map, missionLog] = elems
+                waitForSelector(".mission-log-wrapper"),
+            ]).then((elems) => {
+                [map, missionLog] = elems;
 
                 // Schedule to fade out
                 hideMissionLog(CONFIG.initialHideTime);
 
                 // Register observer for map class changes
-                var mapObserver = new MutationObserver(ms => ms.forEach(m => onMapClassChanged()));
-                mapObserver.observe(map, { attributes: true, attributeFilter: ["class"] });
+                var mapObserver = new MutationObserver((ms) =>
+                    ms.forEach((m) => onMapClassChanged())
+                );
+                mapObserver.observe(map, {
+                    attributes: true,
+                    attributeFilter: ["class"],
+                });
             });
         });
 
         // Register for events
         engine.addModelChangeListener(g_missionPromptUIData, "m_missionUIData", () => {
             if (map && missionLog) {
-                let m_eUpdateType = g_missionPromptUIData.m_eUpdateType
-                _LOG("g_missionPromptUIData.m_eUpdateType = " + m_eUpdateType)
-                
+                let m_eUpdateType = g_missionPromptUIData.m_eUpdateType;
+                _LOG("g_missionPromptUIData.m_eUpdateType = " + m_eUpdateType);
+
                 if (CONFIG.missionUpdateHideTime > 0) {
-                    showMissionLog(false)
-                    hideMissionLog(CONFIG.missionUpdateHideTime)
+                    showMissionLog(false);
+                    hideMissionLog(CONFIG.missionUpdateHideTime);
                 }
             }
-        })        
+        });
 
         // Event Handlers
         function onMapClassChanged() {
-            let isInMap = map.classList.contains("map--show")
-            missionLog.classList.toggle("dynahud-in-map", isInMap)
+            let isInMap = map.classList.contains("map--show");
+            missionLog.classList.toggle("dynahud-in-map", isInMap);
             if (isInMap) {
                 // Map is now shown
-                showMissionLog(true)
+                showMissionLog(true);
             } else {
                 // Map is now hidden
                 if (missionLogShown) {
-                    hideMissionLog(CONFIG.afterMapCloseHideTime)
+                    hideMissionLog(CONFIG.afterMapCloseHideTime);
                 }
             }
         }
@@ -266,20 +277,21 @@
         function hideMissionLog(time) {
             if (!hideTimer) {
                 hideTimer = setTimeout(() => {
-                    missionLogShown = false
-                    missionLog.classList.add("dynahud-hide")
-                    hideTimer = 0
-                }, time)
+                    missionLogShown = false;
+                    missionLog.classList.add("dynahud-hide");
+                    hideTimer = 0;
+                }, time);
             }
         }
 
         function showMissionLog(forceOpacity = true) {
-            if (hideTimer) { // Cancel any pending hide requests
-                clearTimeout(hideTimer)
-                hideTimer = 0
+            if (hideTimer) {
+                // Cancel any pending hide requests
+                clearTimeout(hideTimer);
+                hideTimer = 0;
             }
-            missionLog.classList.remove("dynahud-hide")
-            missionLogShown = true
+            missionLog.classList.remove("dynahud-hide");
+            missionLogShown = true;
         }
     }
 
@@ -296,7 +308,7 @@
         let crosshair;
 
         UIF.hud.onHUDVisible(() => {
-            waitForSelector(".awesome-crosshair").then(crosshairElem => {
+            waitForSelector(".awesome-crosshair").then((crosshairElem) => {
                 crosshair = crosshairElem;
                 evaluateDisplayConditions();
             });
@@ -304,24 +316,23 @@
 
         // Register player mode change listener
         engine.addModelChangeListener(g_HUDMode, "m_iPlayerMode", () => {
-            let newMode = g_HUDMode.m_iPlayerMode
-            let oldMode = playerMode
+            let newMode = g_HUDMode.m_iPlayerMode;
+            let oldMode = playerMode;
 
             if (newMode != oldMode) {
-                playerMode = newMode
+                playerMode = newMode;
                 if (newMode == PLAYER_MODE.ADVENTURING) {
                     // _LOG("Crosshair: Player entering adventuring mode")
-                    evaluateDisplayConditions()
-                }
-                else if (oldMode == PLAYER_MODE.ADVENTURING) {
+                    evaluateDisplayConditions();
+                } else if (oldMode == PLAYER_MODE.ADVENTURING) {
                     // _LOG("Crosshair: Player leaving adventuring mode, new: " + newMode)
-                    evaluateDisplayConditions()
+                    evaluateDisplayConditions();
                 }
             }
-        })
+        });
 
         // Register crosshair type change listener
-        engine.addModelChangeListener(g_crosshairData, 'm_eCrosshairType', () => {
+        engine.addModelChangeListener(g_crosshairData, "m_eCrosshairType", () => {
             // _LOG('Crosshair: changed, new type: ' + g_crosshairData.m_eCrosshairType);
             evaluateDisplayConditions();
         });
@@ -361,26 +372,26 @@
     //==============
     function setupAmmoBar() {
         // Get user's opacity preference
-        let desiredOpacity = getCSSProperty("--dynahud-opacity-ammo-bar")
+        let desiredOpacity = getCSSProperty("--dynahud-opacity-ammo-bar");
         if (desiredOpacity < 1) {
             UIF.hud.onHUDVisible(() => {
-                waitForSelector(".awesome-crosshair--ammo").then(ammoBar => {
+                waitForSelector(".awesome-crosshair--ammo").then((ammoBar) => {
                     // Get the ammo model
-                    let ammoBarComponent = getComponent(ammoBar)
-                    let ammoModel = ammoBarComponent.ammoModel
+                    let ammoBarComponent = getComponent(ammoBar);
+                    let ammoModel = ammoBarComponent.ammoModel;
 
                     // Give the ammo bar a CSS opacity transition since we're going to override the JS tween
-                    ammoBar.style.transition = "opacity 300ms var(--easing)"
+                    ammoBar.style.transition = "opacity 300ms var(--easing)";
 
                     // Hook AmmoModel.setAmmoCounterVisibilityState
-                    ammoModel.setAmmoCounterVisibilityState // for some reason, need to access it before we can overwrite it
-                    ammoModel.setAmmoCounterVisibilityState = visible => {
-                        _LOG("setAmmoCounterVisibilityState: " + visible)
-                        ammoModel.showAmmoCounter = visible
-                        ammoModel.globalOpacity = visible ? desiredOpacity : 0
-                    }
-                })
-            })
+                    ammoModel.setAmmoCounterVisibilityState; // for some reason, need to access it before we can overwrite it
+                    ammoModel.setAmmoCounterVisibilityState = (visible) => {
+                        _LOG("setAmmoCounterVisibilityState: " + visible);
+                        ammoModel.showAmmoCounter = visible;
+                        ammoModel.globalOpacity = visible ? desiredOpacity : 0;
+                    };
+                });
+            });
         }
     }
 
@@ -388,7 +399,6 @@
     // Utilities
     //==============
     function getCSSProperty(name) {
-        return getComputedStyle(document.documentElement).getPropertyValue(name)
+        return getComputedStyle(document.documentElement).getPropertyValue(name);
     }
-
 })();
